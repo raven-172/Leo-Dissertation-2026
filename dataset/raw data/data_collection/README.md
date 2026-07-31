@@ -303,7 +303,7 @@ The current script therefore sends one physical click to close the completed dow
 This repository contains three main files:
 
 ```text
-smartpss_playback_export.py
+smartpss_playback_export_ai.py
 smartpss_export_tasks.xlsx
 README.md
 ```
