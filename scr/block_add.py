@@ -3,10 +3,12 @@ from __future__ import annotations
 import torch
 from torch import Tensor, nn
 
-__all__ = ["CoordinateAttention"]
+from ultralytics.nn.modules.block import C2f, C3
+
+__all__ = ["CA", "RCAB", "RCAC3k", "RCAC3k2"]
 
 
-class CoordinateAttention(nn.Module):
+class CA(nn.Module):
 
     def __init__(self, channels: int, reduction: int = 32) -> None:
         super().__init__()
@@ -82,3 +84,110 @@ class CoordinateAttention(nn.Module):
 
         # Equation (9): y_c(i,j) = x_c(i,j) * g_h_c(i) * g_w_c(j).
         return identity * g_h * g_w
+
+
+
+class RCAB(nn.Module):
+    """Residual block containing Coordinate Attention.
+
+    Structure from Paper 22, equations (8) and (9):
+
+        X_C = CBS_3x3(CBS_1x1(X_R))
+        Y_C = CA(X_C)
+        Y_R = Y_C + X_R
+
+    The residual coefficient matrix K in equation (9) is set to one, which
+    corresponds to the standard residual connection shown in Figure 3.
+    """
+
+    def __init__(self, channels: int, reduction: int = 32) -> None:
+        super().__init__()
+
+        self.cbs_1x1 = nn.Sequential(
+            nn.Conv2d(
+                channels,
+                channels,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+            ),
+            nn.BatchNorm2d(channels),
+            nn.SiLU(inplace=True),
+        )
+
+        self.cbs_3x3 = nn.Sequential(
+            nn.Conv2d(
+                channels,
+                channels,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(channels),
+            nn.SiLU(inplace=True),
+        )
+
+        self.ca = CA(channels, reduction)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x_c = self.cbs_3x3(self.cbs_1x1(x))
+        y_c = self.ca(x_c)
+        return y_c + x
+
+
+class RCAC3k(C3):
+    """C3 block whose internal Bottleneck blocks are replaced by RCAB."""
+
+    def __init__(
+        self,
+        c1: int,
+        c2: int,
+        n: int = 1,
+        shortcut: bool = True,
+        g: int = 1,
+        e: float = 0.5,
+        reduction: int = 32,
+    ) -> None:
+        super().__init__(c1, c2, n, shortcut, g, e)
+        hidden_channels = int(c2 * e)
+        self.m = nn.Sequential(
+            *(RCAB(hidden_channels, reduction) for _ in range(n))
+        )
+
+
+class RCAC3k2(C2f):
+    """C3k2 variant that replaces every Bottleneck with RCAB.
+
+    When ``c3k=False``, each repeated unit inside C2f is one RCAB.
+
+    When ``c3k=True``, each repeated unit inside C2f is one RCAC3k block
+    containing two consecutive RCAB blocks.
+    """
+
+    def __init__(
+        self,
+        c1: int,
+        c2: int,
+        n: int = 1,
+        c3k: bool = False,
+        e: float = 0.5,
+        g: int = 1,
+        shortcut: bool = True,
+        reduction: int = 32,
+    ) -> None:
+        super().__init__(c1, c2, n, shortcut, g, e)
+        self.m = nn.ModuleList(
+            RCAC3k(
+                self.c,
+                self.c,
+                n=2,
+                shortcut=shortcut,
+                g=g,
+                reduction=reduction,
+            )
+            if c3k
+            else RCAB(self.c, reduction)
+            for _ in range(n)
+        )
