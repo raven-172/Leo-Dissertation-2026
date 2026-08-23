@@ -9,7 +9,7 @@ import math
 
 from ultralytics.nn.modules.block import C2f, C3
 
-__all__ = ["CA", "RCAB", "RCAC3k", "RCAC3k2", "SAM", "CAM", "CBAM"]
+__all__ = ["CA", "RCAB", "RCAC3k", "RCAC3k2", "SAM", "CAM", "CBAM", "AKConv"]
 
 
 class CA(nn.Module):
