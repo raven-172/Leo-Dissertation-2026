@@ -44,7 +44,7 @@ This means:
 
 The configurations use:
 
-- `nc: 80` for 80 object classes.
+- `nc: 1` for 1 object classes (person).
 - `end2end: True` for end-to-end detection.
 - `reg_max: 1` for the YOLO26 DFL-free regression design.
 - P3, P4 and P5 outputs for multi-scale detection.
