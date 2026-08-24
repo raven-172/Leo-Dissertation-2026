@@ -249,7 +249,7 @@ def install_custom_parser():
     """Register custom blocks, official CBAM, and this parser in Ultralytics."""
     parser_modules = (CA, RCAB, RCAC3k, RCAC3k2, CBAM, AKConv)
     for module in parser_modules:
-        setattr(_ultralytics_tasks, module.__name__, module)
+        globals()[module.__name__] = module
     _ultralytics_tasks.parse_model = parse_model
     return parse_model
 
