@@ -1,9 +1,26 @@
-#from ultralytics.nn.modules import CustomBlock 
-from block_add import *
+"""Ultralytics model parser extended with the dissertation's custom blocks."""
+
+from __future__ import annotations
+
+import ast
+import contextlib
+
+import torch
+from ultralytics.nn import tasks as _ultralytics_tasks
+
+from .block_add import AKConv, CA, CAM, CBAM, RCAB, RCAC3k, RCAC3k2, SAM
+
+# Import the parser context from the pinned Ultralytics version. setdefault keeps
+# the custom classes above when an upstream symbol happens to use the same name.
+for _name, _value in vars(_ultralytics_tasks).items():
+    if not _name.startswith("__"):
+        globals().setdefault(_name, _value)
+
+__all__ = ["install_custom_parser", "parse_model"]
+
 
 def parse_model(d, ch, verbose=True):
-    """Parse a YOLO model.yaml dictionary into a PyTorch model."""
-    import ast
+    """Parse a YOLO model YAML dictionary into a PyTorch model."""
 
     legacy = True
     max_channels = float("inf")
@@ -45,6 +62,7 @@ def parse_model(d, ch, verbose=True):
             C2,
             C2f,
             C3k2,
+            # [KHÁC PARSER GỐC] Residual Coordinate Attention modules.
             RCAC3k,
             RCAC3k2,
             RepNCSPELAN4,
@@ -73,6 +91,7 @@ def parse_model(d, ch, verbose=True):
             C2,
             C2f,
             C3k2,
+            # [KHÁC PARSER GỐC] These modules receive the scaled repeat count.
             RCAC3k,
             RCAC3k2,
             C2fAttn,
@@ -121,6 +140,7 @@ def parse_model(d, ch, verbose=True):
             if m in repeat_modules:
                 args.insert(2, n)
                 n = 1
+            # [KHÁC PARSER GỐC] RCAC3k2 follows C3k2 scale-specific behavior.
             if m in {C3k2, RCAC3k2}:
                 legacy = False
                 if scale in "mlx":
@@ -185,11 +205,22 @@ def parse_model(d, ch, verbose=True):
             c2 = args[0]
             c1 = ch[f]
             args = [*args[1:]]
+        # [KHÁC PARSER GỐC] Custom module argument and channel handling.
         elif m is CA:
+            if not args:
+                raise ValueError("CA requires YAML args [output_channels, reduction].")
+            c1 = ch[f]
+            c2 = make_divisible(min(args[0], max_channels) * width, 8)
+            if c1 != c2:
+                raise ValueError(f"CA requires equal input/output channels, got c1={c1}, c2={c2}.")
+            args = [c1, c2, *args[1:]]
+        elif m is AKConv:
+            if len(args) < 2:
+                raise ValueError("AKConv requires YAML args [output_channels, num_param, stride?].")
             c1 = ch[f]
             c2 = make_divisible(min(args[0], max_channels) * width, 8)
             args = [c1, c2, *args[1:]]
-        elif m in frozenset({RCAB, RCAC3k, RCAC3k2, CBAM}):
+        elif m in frozenset({RCAB, CAM, CBAM}):
             c1 = ch[f]
             c2 = c1
             args = [c1, *args]
@@ -209,3 +240,16 @@ def parse_model(d, ch, verbose=True):
         ch.append(c2)
 
     return torch.nn.Sequential(*layers), sorted(save)
+
+
+def install_custom_parser():
+    """Register custom blocks and this parser in Ultralytics' task module."""
+    custom_modules = (CA, RCAB, RCAC3k, RCAC3k2, SAM, CAM, CBAM, AKConv)
+    for module in custom_modules:
+        setattr(_ultralytics_tasks, module.__name__, module)
+    _ultralytics_tasks.parse_model = parse_model
+    return parse_model
+
+
+# Importing scr.tasks is the explicit opt-in that activates the custom parser.
+install_custom_parser()
