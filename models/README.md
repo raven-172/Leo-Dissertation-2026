@@ -103,6 +103,8 @@ This model adds a Coordinate Attention (`CA`) layer near the end of the backbone
 C3k2 → CA → SPPF → C2PSA
 ```
 
+The YAML declares `CA, [1024, 32]`. Here, `1024` is the design-time channel count and `32` is the reduction ratio. For scale `s`, the parser applies width `0.5`, so the actual call is `CA(512, 512, 32)`. Inside CA, the intermediate attention width is `max(8, 512 // 32) = 16`; the value `32` does not force the layer output to 32 channels.
+
 Coordinate Attention separately analyses information along the image's height and width. This helps the network understand:
 
 - **What** feature is important.
@@ -124,7 +126,7 @@ Use attention and adaptive feature sampling to improve the detection of objects 
 - [Paper 32 — Convolutional Block Attention Module](../docs/paper/paper32.pdf)
 - [Paper 41 — Linear Deformable Convolution](../docs/paper/paper41.pdf)
 
-**Intended structure**
+**Implemented structure**
 
 ```text
 YOLO26 backbone
@@ -144,9 +146,9 @@ P3, P4 and P5 detection
 - `AKConv` learns where to sample features instead of being restricted to a fixed square convolution pattern.
 - Together, they are intended to capture useful visible fragments when an object is partly hidden.
 
-**Current configuration note**
+**Current configuration**
 
-The current YAML contains an `AKConv` layer, but it does not contain a `CBAM` layer. Therefore, the current file implements an AKConv variant rather than the complete CBAM–AKConv design suggested by its filename.
+The YAML now applies `CBAM, [16]` followed by `AKConv, [1024, 6, 1]`. The value `16` is CBAM's channel-reduction ratio. For scale `s`, AKConv's declared 1024 output channels are scaled to 512; `6` is the number of adaptive sampling points and stride `1` preserves the P5/32 resolution. The Detect layer receives the corrected P3, P4 and P5 indices after these two inserted layers.
 
 ---
 
