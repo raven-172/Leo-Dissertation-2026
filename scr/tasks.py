@@ -250,7 +250,6 @@ def install_custom_parser():
     parser_modules = (CA, RCAB, RCAC3k, RCAC3k2, CBAM, AKConv)
     for module in parser_modules:
         globals()[module.__name__] = module
-    _ultralytics_tasks.parse_model = parse_model
     return parse_model
 
 
