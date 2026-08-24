@@ -185,7 +185,11 @@ def parse_model(d, ch, verbose=True):
             c2 = args[0]
             c1 = ch[f]
             args = [*args[1:]]
-        elif m in frozenset({CA, RCAB, RCAC3k, RCAC3k2, CBAM}):
+        elif m is CA:
+            c1 = ch[f]
+            c2 = make_divisible(min(args[0], max_channels) * width, 8)
+            args = [c1, c2, *args[1:]]
+        elif m in frozenset({RCAB, RCAC3k, RCAC3k2, CBAM}):
             c1 = ch[f]
             c2 = c1
             args = [c1, *args]
