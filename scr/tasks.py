@@ -10,7 +10,8 @@ from ultralytics.nn import tasks as _ultralytics_tasks
 
 from .block_add import AKConv, CA, CAM, CBAM, RCAB, RCAC3k, RCAC3k2, SAM
 
-# Import the parser context from the pinned Ultralytics version. setdefault keeps
+# [KHÁC PARSER GỐC] Reuse the parser context from the pinned Ultralytics version.
+# setdefault keeps
 # the custom classes above when an upstream symbol happens to use the same name.
 for _name, _value in vars(_ultralytics_tasks).items():
     if not _name.startswith("__"):
@@ -242,6 +243,7 @@ def parse_model(d, ch, verbose=True):
     return torch.nn.Sequential(*layers), sorted(save)
 
 
+# [KHÁC PARSER GỐC] Register the custom symbols and parser in Ultralytics.
 def install_custom_parser():
     """Register custom blocks and this parser in Ultralytics' task module."""
     custom_modules = (CA, RCAB, RCAC3k, RCAC3k2, SAM, CAM, CBAM, AKConv)
