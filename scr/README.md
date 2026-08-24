@@ -7,7 +7,7 @@ The `scr` package contains the custom neural-network blocks and the parser integ
 ```text
 scr/
 ├── __init__.py          # Activates the custom parser when `scr` is imported
-├── block_add.py         # Defines CA, RCAB, RCAC3k2, CBAM and AKConv
+├── block_add.py         # Defines CA, RCAB, RCAC3k2 and AKConv
 ├── tasks.py             # Extends the pinned Ultralytics parser
 ├── validate_models.py   # Builds and forwards every model YAML
 └── README.md
@@ -45,10 +45,10 @@ Every intentional change inside the copied parser flow is labelled:
 
 The custom flow:
 
-- registers all classes from `block_add.py` in `ultralytics.nn.tasks`;
+- registers the classes from `block_add.py` and Ultralytics' official `CBAM` in `ultralytics.nn.tasks`;
 - scales the declared output channels of `CA` and `AKConv` by the selected model width;
 - passes the scaled repeat count into `RCAC3k` and `RCAC3k2`;
-- treats `RCAB`, `CAM`, and `CBAM` as channel-preserving blocks;
+- treats `RCAB` and Ultralytics' official `CBAM` as channel-preserving blocks;
 - keeps `CA` input and output channels equal so its element-wise attention multiplication is valid.
 
 ## Validation
