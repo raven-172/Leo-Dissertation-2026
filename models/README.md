@@ -148,7 +148,7 @@ P3, P4 and P5 detection
 
 **Current configuration**
 
-The YAML now applies `CBAM, [16]` followed by `AKConv, [1024, 6, 1]`. The value `16` is CBAM's channel-reduction ratio. For scale `s`, AKConv's declared 1024 output channels are scaled to 512; `6` is the number of adaptive sampling points and stride `1` preserves the P5/32 resolution. The Detect layer receives the corrected P3, P4 and P5 indices after these two inserted layers.
+The YAML applies Ultralytics' official `CBAM, [7]` followed by `AKConv, [1024, 6, 1]`. The parser supplies the 512 input channels at scale `s`, while `7` selects the 7×7 spatial-attention kernel; it is not a channel-reduction ratio. AKConv's declared 1024 output channels are scaled to 512, `6` is the number of adaptive sampling points, and stride `1` preserves the P5/32 resolution. The Detect layer receives the corrected P3, P4 and P5 indices after these two inserted layers.
 
 ---
 
