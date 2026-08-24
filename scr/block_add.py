@@ -202,7 +202,7 @@ class SAM(nn.Module):
         avg = torch.mean(x,1).unsqueeze(1)
         concat = torch.cat((max,avg), dim=1)
         output = self.conv(concat)
-        output = F.sigmoid(output) * x 
+        output = torch.sigmoid(output) * x 
         return output 
 
 class CAM(nn.Module):
@@ -222,7 +222,7 @@ class CAM(nn.Module):
         linear_max = self.linear(max.view(b,c)).view(b, c, 1, 1)
         linear_avg = self.linear(avg.view(b,c)).view(b, c, 1, 1)
         output = linear_max + linear_avg
-        output = F.sigmoid(output) * x
+        output = torch.sigmoid(output) * x
         return output
     
 class CBAM(nn.Module):
@@ -247,13 +247,15 @@ class AKConv(nn.Module):
         self.conv = nn.Sequential(nn.Conv2d(inc, outc, kernel_size=(num_param, 1), stride=(num_param, 1), bias=bias),nn.BatchNorm2d(outc),nn.SiLU())  # the conv adds the BN and SiLU to compare original Conv in YOLOv5.
         self.p_conv = nn.Conv2d(inc, 2 * num_param, kernel_size=3, padding=1, stride=stride)
         nn.init.constant_(self.p_conv.weight, 0)
-        self.p_conv.register_full_backward_hook(self._set_lr)
+        self.p_conv.weight.register_hook(self._scale_gradient)
+        if self.p_conv.bias is not None:
+            self.p_conv.bias.register_hook(self._scale_gradient)
         self.register_buffer("p_n", self._get_p_n(N=self.num_param))
 
     @staticmethod
-    def _set_lr(module, grad_input, grad_output):
-        grad_input = (grad_input[i] * 0.1 for i in range(len(grad_input)))
-        grad_output = (grad_output[i] * 0.1 for i in range(len(grad_output)))
+    def _scale_gradient(gradient):
+        """Scale offset-convolution gradients to one tenth of the base learning rate."""
+        return gradient * 0.1
 
     def forward(self, x):
         # N is num_param.
@@ -308,13 +310,17 @@ class AKConv(nn.Module):
         mod_number = self.num_param % base_int
         p_n_x,p_n_y = torch.meshgrid(
             torch.arange(0, row_number),
-            torch.arange(0,base_int))
+            torch.arange(0,base_int),
+            indexing="ij",
+        )
         p_n_x = torch.flatten(p_n_x)
         p_n_y = torch.flatten(p_n_y)
         if mod_number >  0:
             mod_p_n_x,mod_p_n_y = torch.meshgrid(
                 torch.arange(row_number,row_number+1),
-                torch.arange(0,mod_number))
+                torch.arange(0,mod_number),
+                indexing="ij",
+            )
 
             mod_p_n_x = torch.flatten(mod_p_n_x)
             mod_p_n_y = torch.flatten(mod_p_n_y)
@@ -327,7 +333,9 @@ class AKConv(nn.Module):
     def _get_p_0(self, h, w, N, dtype):
         p_0_x, p_0_y = torch.meshgrid(
             torch.arange(0, h * self.stride, self.stride),
-            torch.arange(0, w * self.stride, self.stride))
+            torch.arange(0, w * self.stride, self.stride),
+            indexing="ij",
+        )
 
         p_0_x = torch.flatten(p_0_x).view(1, 1, h, w).repeat(1, N, 1, 1)
         p_0_y = torch.flatten(p_0_y).view(1, 1, h, w).repeat(1, N, 1, 1)
