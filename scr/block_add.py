@@ -12,83 +12,77 @@ from ultralytics.nn.modules.block import C2f, C3
 __all__ = ["CA", "RCAB", "RCAC3k", "RCAC3k2", "SAM", "CAM", "CBAM", "AKConv"]
 
 
-class CA(nn.Module):
+class h_sigmoid(nn.Module):
+    """Hard sigmoid activation used by Coordinate Attention."""
 
-    def __init__(self, channels: int, reduction: int = 32) -> None:
+    def __init__(self, inplace: bool = True) -> None:
+        super().__init__()
+        self.relu = nn.ReLU6(inplace=inplace)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.relu(x + 3) / 6
+
+
+class h_swish(nn.Module):
+    """Hard swish activation used by Coordinate Attention."""
+
+    def __init__(self, inplace: bool = True) -> None:
+        super().__init__()
+        self.sigmoid = h_sigmoid(inplace=inplace)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x * self.sigmoid(x)
+
+
+class CA(nn.Module):
+    """Coordinate Attention with separate height and width attention maps."""
+
+    def __init__(self, inp: int, oup: int, reduction: int = 32) -> None:
         super().__init__()
 
-        if not isinstance(channels, int) or channels <= 0:
-            raise ValueError(f"channels must be a positive integer, got {channels!r}")
+        if not isinstance(inp, int) or inp <= 0:
+            raise ValueError(f"inp must be a positive integer, got {inp!r}")
+        if not isinstance(oup, int) or oup <= 0:
+            raise ValueError(f"oup must be a positive integer, got {oup!r}")
+        if inp != oup:
+            raise ValueError(
+                f"CA requires inp == oup for residual attention multiplication, got inp={inp}, oup={oup}"
+            )
         if not isinstance(reduction, int) or reduction <= 0:
             raise ValueError(
                 f"reduction must be a positive integer, got {reduction!r}"
             )
 
-        self.channels = channels
+        self.inp = inp
+        self.oup = oup
         self.reduction = reduction
-        reduced_channels = max(1, channels // reduction)
+        self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
+        self.pool_w = nn.AdaptiveAvgPool2d((1, None))
 
-        # Shared F1 in equation (6): C -> C/r.
-        self.conv_shared = nn.Conv2d(
-            channels,
-            reduced_channels,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            bias=False,
-        )
-        self.bn = nn.BatchNorm2d(reduced_channels)
+        mip = max(8, inp // reduction)
+        self.conv1 = nn.Conv2d(inp, mip, kernel_size=1, stride=1, padding=0)
+        self.bn1 = nn.BatchNorm2d(mip)
+        self.act = h_swish()
 
-        # Paper 13 explicitly uses ReLU as delta in equation (6).
-        self.relu = nn.ReLU(inplace=True)
-
-        # F_h and F_w in equations (7) and (8): C/r -> C.
-        self.conv_h = nn.Conv2d(
-            reduced_channels,
-            channels,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-        )
-        self.conv_w = nn.Conv2d(
-            reduced_channels,
-            channels,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-        )
-        self.sigmoid = nn.Sigmoid()
+        self.conv_h = nn.Conv2d(mip, oup, kernel_size=1, stride=1, padding=0)
+        self.conv_w = nn.Conv2d(mip, oup, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x: Tensor) -> Tensor:
-        """Apply coordinate attention to a four-dimensional feature map."""
         identity = x
-        height, width = x.shape[2:]
+        _, _, height, width = x.size()
 
-        # Equation (4): average each row along W -> z_h in R^(N,C,H,1).
-        z_h = x.mean(dim=3, keepdim=True)
+        x_h = self.pool_h(x)
+        x_w = self.pool_w(x).permute(0, 1, 3, 2)
 
-        # Equation (5): average each column along H -> z_w in R^(N,C,1,W).
-        z_w = x.mean(dim=2, keepdim=True)
+        y = torch.cat((x_h, x_w), dim=2)
+        y = self.act(self.bn1(self.conv1(y)))
 
-        # Rotate z_w so both descriptors can be concatenated along one spatial
-        # dimension: (N,C,H,1) + (N,C,W,1) -> (N,C,H+W,1).
-        z_w_for_concat = z_w.permute(0, 1, 3, 2)
+        x_h, x_w = torch.split(y, (height, width), dim=2)
+        x_w = x_w.permute(0, 1, 3, 2)
 
-        # Equation (6): f = ReLU(BN(F1([z_h, z_w]))).
-        f = torch.cat((z_h, z_w_for_concat), dim=2)
-        f = self.relu(self.bn(self.conv_shared(f)))
-
-        # Recover the two coordinate branches described after equation (6).
-        f_h, f_w = torch.split(f, (height, width), dim=2)
-        f_w = f_w.permute(0, 1, 3, 2)
-
-        # Equations (7) and (8).
-        g_h = self.sigmoid(self.conv_h(f_h))  # (N,C,H,1)
-        g_w = self.sigmoid(self.conv_w(f_w))  # (N,C,1,W)
-
-        # Equation (9): y_c(i,j) = x_c(i,j) * g_h_c(i) * g_w_c(j).
-        return identity * g_h * g_w
-
+        a_h = self.conv_h(x_h).sigmoid()
+        a_w = self.conv_w(x_w).sigmoid()
+        return identity * a_w * a_h
 
 
 class RCAB(nn.Module):
@@ -133,7 +127,7 @@ class RCAB(nn.Module):
             nn.SiLU(inplace=True),
         )
 
-        self.ca = CA(channels, reduction)
+        self.ca = CA(channels, channels, reduction)
 
     def forward(self, x: Tensor) -> Tensor:
         x_c = self.cbs_3x3(self.cbs_1x1(x))
