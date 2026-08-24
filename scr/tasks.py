@@ -7,8 +7,9 @@ import contextlib
 
 import torch
 from ultralytics.nn import tasks as _ultralytics_tasks
+from ultralytics.nn.modules import CBAM
 
-from .block_add import AKConv, CA, CAM, CBAM, RCAB, RCAC3k, RCAC3k2, SAM
+from .block_add import AKConv, CA, RCAB, RCAC3k, RCAC3k2
 
 # [KHÁC PARSER GỐC] Reuse the parser context from the pinned Ultralytics version.
 # setdefault keeps
@@ -221,7 +222,7 @@ def parse_model(d, ch, verbose=True):
             c1 = ch[f]
             c2 = make_divisible(min(args[0], max_channels) * width, 8)
             args = [c1, c2, *args[1:]]
-        elif m in frozenset({RCAB, CAM, CBAM}):
+        elif m in frozenset({RCAB, CBAM}):
             c1 = ch[f]
             c2 = c1
             args = [c1, *args]
@@ -245,9 +246,9 @@ def parse_model(d, ch, verbose=True):
 
 # [KHÁC PARSER GỐC] Register the custom symbols and parser in Ultralytics.
 def install_custom_parser():
-    """Register custom blocks and this parser in Ultralytics' task module."""
-    custom_modules = (CA, RCAB, RCAC3k, RCAC3k2, SAM, CAM, CBAM, AKConv)
-    for module in custom_modules:
+    """Register custom blocks, official CBAM, and this parser in Ultralytics."""
+    parser_modules = (CA, RCAB, RCAC3k, RCAC3k2, CBAM, AKConv)
+    for module in parser_modules:
         setattr(_ultralytics_tasks, module.__name__, module)
     _ultralytics_tasks.parse_model = parse_model
     return parse_model
