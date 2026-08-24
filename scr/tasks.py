@@ -7,7 +7,7 @@ import contextlib
 
 import torch
 from ultralytics.nn import tasks as _ultralytics_tasks
-from ultralytics.nn.modules import CBAM
+from ultralytics.nn.modules import CBAM, WorldDetect
 
 from .block_add import AKConv, CA, RCAB, RCAC3k, RCAC3k2
 
