@@ -35,7 +35,7 @@ class h_swish(nn.Module):
 
 
 class CA(nn.Module):
-    """Coordinate Attention with separate height and width attention maps."""
+    """Coordinate Attention adapted from https://github.com/houqb/CoordAttention/blob/main/coordatt.py."""
 
     def __init__(self, inp: int, oup: int, reduction: int = 32) -> None:
         super().__init__()
