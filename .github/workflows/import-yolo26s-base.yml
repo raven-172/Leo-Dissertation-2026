@@ -158,6 +158,7 @@ jobs:
         run: |
           set -euo pipefail
           git lfs install --local
+          git lfs track 'results/yolo26s_base/**/*.pt'
           while IFS= read -r -d '' file; do
             git lfs track -- "$file"
           done < <(find results/yolo26s_base -type f -size +95M -print0)
