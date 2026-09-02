@@ -1,5 +1,29 @@
 # YOLO26s Base Model Results
 
+## File and Folder Guide
+
+| Item | Description |
+|---|---|
+| `README.md` | Summary of the model configuration, training results, and test evaluation. |
+| `args.yaml` | Configuration and hyperparameters used for training. |
+| `results.csv` | Training and validation metrics recorded for each epoch. |
+| `results.png` | Combined plots showing how losses and evaluation metrics changed during training. |
+| `BoxF1_curve.png` | F1 score at different confidence thresholds. |
+| `BoxPR_curve.png` | Relationship between precision and recall. |
+| `BoxP_curve.png` | Precision at different confidence thresholds. |
+| `BoxR_curve.png` | Recall at different confidence thresholds. |
+| `confusion_matrix.png` | Raw confusion matrix showing model predictions for each class. |
+| `confusion_matrix_normalized.png` | Normalized confusion matrix for easier comparison between classes. |
+| `labels.jpg` | Distribution and locations of object labels in the training dataset. |
+| `train_batch0.jpg` – `train_batch2.jpg` | Example training batches with labels and augmentations applied. |
+| `val_batch0_labels.jpg` – `val_batch2_labels.jpg` | Ground-truth labels from example validation batches. |
+| `val_batch0_pred.jpg` – `val_batch2_pred.jpg` | Model predictions for the corresponding validation batches. |
+| `weights/` | Model checkpoint files saved during training. |
+| `weights/best.pt` | Checkpoint with the best validation performance. |
+| `weights/last.pt` | Checkpoint saved at the end of training. |
+| `weights/epoch*.pt` | Periodic checkpoints saved every 10 epochs. |
+| `.gitkeep` | Placeholder originally used to keep the directory in Git while it was empty. |
+
 ## Overview
 
 This directory contains the training artifacts and evaluation summary for the baseline YOLO26s object-detection model. The model was trained from scratch without pretrained weights.
