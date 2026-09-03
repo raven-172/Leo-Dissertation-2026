@@ -1,0 +1,85 @@
+name: Restructure ultralytics source directory
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/restructure-ultralytics-adjusted.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restructure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Move source tree and remove generated artifacts
+        run: |
+          set -euo pipefail
+          test -d ultralytics
+          if [ -e ultralytics_adjusted ]; then
+            echo "ultralytics_adjusted already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+
+          mkdir ultralytics_adjusted
+          git mv ultralytics ultralytics_adjusted/ultralytics
+
+          git rm -r -- ultralytics_adjusted/ultralytics/runs/detect/val
+          git rm -r -- ultralytics_adjusted/ultralytics/ultralytics.egg-info
+          git rm -r -- ultralytics_adjusted/ultralytics/weights
+
+      - name: Update Git LFS paths
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path(".gitattributes")
+          content = path.read_text(encoding="utf-8")
+          replacements = {
+              "ultralytics/**/*.pt filter=lfs diff=lfs merge=lfs -text":
+                  "ultralytics_adjusted/ultralytics/**/*.pt filter=lfs diff=lfs merge=lfs -text",
+              "ultralytics/**/*.pth filter=lfs diff=lfs merge=lfs -text":
+                  "ultralytics_adjusted/ultralytics/**/*.pth filter=lfs diff=lfs merge=lfs -text",
+              "ultralytics/**/*.onnx filter=lfs diff=lfs merge=lfs -text":
+                  "ultralytics_adjusted/ultralytics/**/*.onnx filter=lfs diff=lfs merge=lfs -text",
+          }
+          for old, new in replacements.items():
+              if old not in content:
+                  raise RuntimeError(f"Expected Git LFS rule was not found: {old}")
+              content = content.replace(old, new)
+          path.write_text(content, encoding="utf-8")
+          PY
+          git add .gitattributes
+
+      - name: Verify requested structure
+        run: |
+          set -euo pipefail
+          test -d ultralytics_adjusted/ultralytics
+          test ! -e ultralytics
+          test ! -e ultralytics_adjusted/ultralytics/runs/detect/val
+          test ! -e ultralytics_adjusted/ultralytics/ultralytics.egg-info
+          test ! -e ultralytics_adjusted/ultralytics/weights
+
+          file_count="$(find ultralytics_adjusted/ultralytics -type f | wc -l | tr -d ' ')"
+          directory_count="$(find ultralytics_adjusted/ultralytics -type d | wc -l | tr -d ' ')"
+          echo "RESTRUCTURE_REPORT file_count=$file_count directory_count=$directory_count"
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git status --short
+          git commit -m "Move cleaned ultralytics source under ultralytics_adjusted"
+          git push origin main
