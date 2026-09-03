@@ -37,7 +37,7 @@ This directory contains the training artifacts and evaluation summary for the YO
 | CUDA device | NVIDIA GeForce RTX 5060 Ti |
 | GPU memory | 16,311 MiB |
 | Image size | 640 × 640 |
-| Batch size | 8 |
+| Batch size | 16 |
 | AMP | Enabled |
 
 ## Model Summary
