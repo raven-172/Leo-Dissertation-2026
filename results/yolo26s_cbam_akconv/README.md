@@ -49,18 +49,6 @@ This directory contains the training artifacts and evaluation summary for the YO
 | Parameters | 11,357,517 |
 | Gradients during evaluation | 0 |
 
-## Numerical Stability Warning
-
-During validation, the AKConv module reported a non-finite input tensor with the following information:
-
-| Property | Value |
-|---|---:|
-| Data type | `torch.float32` |
-| Tensor shape | `(1, 512, 20, 20)` |
-| NaN values | 204,800 |
-| Infinite values | 0 |
-
-All 204,800 elements in the reported tensor were NaN. Validation still completed and produced the metrics below, but this warning indicates numerical instability during at least one forward pass. The results should therefore be interpreted cautiously until the source of the NaN values has been investigated.
 
 ## Training Configuration
 
