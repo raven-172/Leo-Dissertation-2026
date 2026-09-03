@@ -69,8 +69,7 @@ jobs:
               run_dir="${candidates[0]}"
             else
               echo "Multiple possible run directories were found:" >&2
-              printf '%s
-' "${candidates[@]}" >&2
+              printf '%s\n' "${candidates[@]}" >&2
               exit 1
             fi
           fi
