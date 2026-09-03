@@ -25,3 +25,6 @@ results/yolo26s_ca/weights/epoch120.pt filter=lfs diff=lfs merge=lfs -text
 results/yolo26s_ca/weights/epoch150.pt filter=lfs diff=lfs merge=lfs -text
 results/yolo26s_cbam_akconv/**/*.pt filter=lfs diff=lfs merge=lfs -text
 results/yolo26s_rcac3k2/**/*.pt filter=lfs diff=lfs merge=lfs -text
+ultralytics/**/*.pt filter=lfs diff=lfs merge=lfs -text
+ultralytics/**/*.pth filter=lfs diff=lfs merge=lfs -text
+ultralytics/**/*.onnx filter=lfs diff=lfs merge=lfs -text
