@@ -91,18 +91,9 @@ The highest validation `mAP50–95` recorded in `results.csv` occurred at epoch 
 - Time at the best recorded epoch: 14,704.8 seconds (approximately 4 h 05 min).
 - Total recorded training time: 19,918.6 seconds (approximately 5 h 32 min).
 
-## Test-Set Evaluation
+## Best-Checkpoint Evaluation
 
-The fused model was evaluated on the test split with the following dataset statistics:
-
-| Dataset statistic | Value |
-|---|---:|
-| Images | 1,226 |
-| Object instances | 2,257 |
-| Background images | 58 |
-| Corrupt images | 0 |
-
-### Test Metrics
+The fused `best.pt` checkpoint was evaluated using 1,226 images containing 2,665 object instances.
 
 | Precision | Recall | mAP50 | mAP50–95 |
 |---:|---:|---:|---:|
