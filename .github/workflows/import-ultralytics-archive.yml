@@ -1,0 +1,173 @@
+name: Import ultralytics source archive
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/import-ultralytics-archive.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import-ultralytics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Install import tools
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --quiet gdown
+          git lfs install --local
+
+      - name: Download archive from Google Drive
+        env:
+          DRIVE_FILE_ID: 15XfHhttxbvWlwL_qE1VLGdkbbAS_uOQg
+        run: |
+          set -euo pipefail
+          work_dir="$(mktemp -d)"
+          echo "IMPORT_WORK_DIR=$work_dir" >> "$GITHUB_ENV"
+          gdown "$DRIVE_FILE_ID" --output "$work_dir/ultralytics.zip"
+
+      - name: Validate and extract archive
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import shutil
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          work_dir = Path(os.environ["IMPORT_WORK_DIR"])
+          archive = work_dir / "ultralytics.zip"
+          extracted = work_dir / "extracted"
+          extracted.mkdir()
+
+          with zipfile.ZipFile(archive) as bundle:
+              members = []
+              for member in bundle.infolist():
+                  normalized = member.filename.replace("\\", "/")
+                  path = PurePosixPath(normalized)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise RuntimeError(f"Unsafe archive path: {member.filename}")
+                  if ".git" in path.parts or "__MACOSX" in path.parts:
+                      continue
+                  members.append(member)
+              bundle.extractall(extracted, members)
+
+          for junk in extracted.rglob(".DS_Store"):
+              junk.unlink()
+          for git_dir in list(extracted.rglob(".git")):
+              if git_dir.is_dir():
+                  shutil.rmtree(git_dir)
+
+          items = sorted(extracted.iterdir(), key=lambda path: path.name.lower())
+          if not items:
+              raise RuntimeError("The archive did not contain any importable items.")
+
+          payload = items[0] if len(items) == 1 and items[0].is_dir() else extracted
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"PAYLOAD_ROOT={payload}\n")
+          PY
+
+      - name: Create the top-level ultralytics directory
+        run: |
+          set -euo pipefail
+          if [ -e ultralytics ]; then
+            echo "The top-level ultralytics path already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+          mkdir ultralytics
+          rsync -a --exclude .git --exclude .DS_Store --exclude __MACOSX "$PAYLOAD_ROOT/" ultralytics/
+
+      - name: Inspect imported contents
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from collections import Counter
+          from pathlib import Path
+
+          target = Path("ultralytics")
+          archive = Path(os.environ["IMPORT_WORK_DIR"]) / "ultralytics.zip"
+          payload = Path(os.environ["PAYLOAD_ROOT"])
+          extracted = Path(os.environ["IMPORT_WORK_DIR"]) / "extracted"
+
+          def digest(path):
+              h = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          files = sorted(path for path in target.rglob("*") if path.is_file())
+          extensions = Counter(path.suffix.lower() or "[no extension]" for path in files)
+          top_level = []
+          for item in sorted(target.iterdir(), key=lambda path: path.name.lower()):
+              if item.is_dir():
+                  child_files = [path for path in item.rglob("*") if path.is_file()]
+                  top_level.append({
+                      "name": item.name,
+                      "type": "directory",
+                      "file_count": len(child_files),
+                      "bytes": sum(path.stat().st_size for path in child_files),
+                  })
+              else:
+                  top_level.append({
+                      "name": item.name,
+                      "type": "file",
+                      "bytes": item.stat().st_size,
+                  })
+
+          largest = sorted(files, key=lambda path: path.stat().st_size, reverse=True)[:20]
+          report = {
+              "archive_name": "ultralytics.zip",
+              "archive_bytes": archive.stat().st_size,
+              "archive_sha256": digest(archive),
+              "payload_root": payload.relative_to(extracted).as_posix() if payload != extracted else ".",
+              "target": target.as_posix(),
+              "file_count": len(files),
+              "directory_count": sum(1 for path in target.rglob("*") if path.is_dir()),
+              "total_bytes": sum(path.stat().st_size for path in files),
+              "extension_counts": dict(sorted(extensions.items())),
+              "top_level_items": top_level,
+              "largest_files": [
+                  {"path": path.relative_to(target).as_posix(), "bytes": path.stat().st_size}
+                  for path in largest
+              ],
+          }
+          print("IMPORT_REPORT_JSON=" + json.dumps(report, ensure_ascii=False, separators=(",", ":")))
+          PY
+
+      - name: Configure Git LFS
+        run: |
+          set -euo pipefail
+          git lfs track "ultralytics/**/*.pt"
+          git lfs track "ultralytics/**/*.pth"
+          git lfs track "ultralytics/**/*.onnx"
+          while IFS= read -r -d '' large_file; do
+            git lfs track "$large_file"
+          done < <(find ultralytics -type f -size +95M -print0)
+
+      - name: Commit and push ultralytics contents
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ultralytics .gitattributes
+          if git diff --cached --quiet; then
+            echo "No files were imported." >&2
+            exit 1
+          fi
+          git commit -m "Import ultralytics source archive"
+          git push origin main
