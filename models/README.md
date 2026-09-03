@@ -53,6 +53,8 @@ The configurations use:
 
 ### [`yolo26s_base.yaml`](yolo26s_base.yaml)
 
+**Results:** [View training artifacts and evaluation results](../results/yolo26s_base/)
+
 **Purpose**
 
 Provide the standard YOLO26s model as the baseline. Experimental variants can be compared with this model to measure whether their custom components improve detection.
@@ -86,6 +88,8 @@ Upsample and combine P5 with P4
 
 ### [`yolo26s_ca.yaml`](yolo26s_ca.yaml)
 
+**Results:** [View training artifacts and evaluation results](../results/yolo26s_ca/)
+
 **Purpose**
 
 Improve the model's ability to locate useful visible features when part of an object is hidden.
@@ -115,6 +119,8 @@ It may help the detector focus on visible parts of an occluded object while redu
 ---
 
 ### [`yolo26s_cbam_akconv.yaml`](yolo26s_cbam_akconv.yaml)
+
+**Results:** [View training artifacts and evaluation results](../results/yolo26s_cbam_akconv/)
 
 **Purpose**
 
@@ -153,6 +159,8 @@ The YAML applies Ultralytics' official `CBAM, [7]` followed by `AKConv, [1024, 6
 ---
 
 ### [`yolo26s_rcac3k2.yaml`](yolo26s_rcac3k2.yaml)
+
+**Results:** [View training artifacts and evaluation results](../results/yolo26s_rcac3k2/)
 
 **Purpose**
 
