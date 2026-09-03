@@ -34,9 +34,9 @@ jobs:
           mkdir ultralytics_adjusted
           git mv ultralytics ultralytics_adjusted/ultralytics
 
-          git rm -r -- ultralytics_adjusted/ultralytics/runs/detect/val
-          git rm -r -- ultralytics_adjusted/ultralytics/ultralytics.egg-info
-          git rm -r -- ultralytics_adjusted/ultralytics/weights
+          git rm -rf -- ultralytics_adjusted/ultralytics/runs/detect/val
+          git rm -rf -- ultralytics_adjusted/ultralytics/ultralytics.egg-info
+          git rm -rf -- ultralytics_adjusted/ultralytics/weights
 
       - name: Update Git LFS paths
         run: |
